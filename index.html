@@ -1,277 +1,64 @@
-```html
-<!DOCTYPE html>
+<!doctype html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>החשבון שלי</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f2f5fa;
-      color: #1d2939;
-    }
-    header {
-      background: #173b70;
-      color: white;
-      padding: 24px 16px;
-      text-align: center;
-    }
-    main { max-width: 800px; margin: auto; padding: 18px; }
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 18px;
-    }
-    .card, .panel {
-      background: white;
-      padding: 16px;
-      border-radius: 14px;
-      box-shadow: 0 2px 8px #0000000c;
-    }
-    .card { text-align: center; }
-    .card strong { display: block; font-size: 20px; margin-top: 8px; }
-    .panel { margin-bottom: 16px; }
-    h2 { font-size: 19px; margin-top: 0; }
-    label { display: block; margin: 12px 0 5px; }
-    input, select, button {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ccd4df;
-      border-radius: 8px;
-      font-size: 16px;
-    }
-    button {
-      margin-top: 14px;
-      background: #1e5aa8;
-      color: white;
-      border: 0;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .transaction {
-      border-bottom: 1px solid #e7ebf0;
-      padding: 12px 0;
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .transaction small { display: block; color: #667085; margin-top: 5px; }
-    .expense { color: #c0392b; }
-    .income { color: #16804a; }
-    .delete {
-      width: auto;
-      margin: 0;
-      padding: 7px 10px;
-      background: #a83232;
-      font-size: 13px;
-    }
-    .notice { color: #667085; font-size: 13px; line-height: 1.5; }
-    @media (max-width: 520px) {
-      .cards { grid-template-columns: 1fr; }
-      .card { padding: 12px; }
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>💰 החשבון שלי</h1>
-    <div>ניהול ההכנסות וההוצאות של המשפחה</div>
-  </header>
-
-  <main>
-    <section class="cards">
-      <div class="card">הכנסות<strong id="income">₪0.00</strong></div>
-      <div class="card">הוצאות<strong id="expense">₪0.00</strong></div>
-      <div class="card">יתרה<strong id="balance">₪0.00</strong></div>
-    </section>
-
-    <section class="panel">
-      <h2>הוספת תנועה</h2>
-      <form id="transactionForm">
-        <label for="person">של מי התנועה?</label>
-        <select id="person" required>
-          <option value="me">שלי</option>
-          <option value="wife">של אשתי</option>
-          <option value="family">הוצאה משפחתית</option>
-        </select>
-
-        <label for="type">סוג התנועה</label>
-        <select id="type" required>
-          <option value="expense">הוצאה</option>
-          <option value="income">הכנסה</option>
-        </select>
-
-        <label for="amount">סכום בשקלים</label>
-        <input id="amount" type="number" min="0.01" step="0.01" required>
-
-        <label for="category">קטגוריה</label>
-        <select id="category" required>
-          <option>מזון וקניות</option>
-          <option>דיור וחשבונות</option>
-          <option>רכב ותחבורה</option>
-          <option>בריאות</option>
-          <option>בילויים</option>
-          <option>קניות אחרות</option>
-          <option>משכורת</option>
-          <option>קצבה</option>
-          <option>הכנסה אחרת</option>
-          <option>אחר</option>
-        </select>
-
-        <label for="description">תיאור</label>
-        <input id="description" type="text" placeholder="לדוגמה: קניות בסופר">
-
-        <label for="date">תאריך</label>
-        <input id="date" type="date" required>
-
-        <button type="submit">הוספת תנועה</button>
-      </form>
-    </section>
-
-    <section class="panel">
-      <h2>התנועות שלי</h2>
-      <label for="filter">סינון לפי אדם</label>
-      <select id="filter">
-        <option value="all">כל המשפחה</option>
-        <option value="me">שלי</option>
-        <option value="wife">של אשתי</option>
-        <option value="family">משפחתי</option>
-      </select>
-      <div id="transactions"></div>
-      <p class="notice">
-        גרסה ראשונית: הנתונים נשמרים בדפדפן במכשיר הזה בלבד.
-        עדיין אין סנכרון לענן או חיבור לבנק.
-      </p>
-      <button id="export">ייצוא לקובץ CSV</button>
-    </section>
-  </main>
-
-  <script>
-    const STORAGE_KEY = "haeshbon_sheli_transactions_v1";
-    const form = document.getElementById("transactionForm");
-    const dateInput = document.getElementById("date");
-    dateInput.value = new Date().toISOString().slice(0, 10);
-
-    let transactions = [];
-    try {
-      transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      if (!Array.isArray(transactions)) transactions = [];
-    } catch {
-      transactions = [];
-    }
-
-    const money = value => new Intl.NumberFormat("he-IL", {
-      style: "currency", currency: "ILS"
-    }).format(value);
-
-    function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-      render();
-    }
-
-    function render() {
-      const filter = document.getElementById("filter").value;
-      const visible = transactions.filter(t => filter === "all" || t.person === filter);
-      const income = visible
-        .filter(t => t.type === "income")
-        .reduce((sum, t) => sum + t.amount, 0);
-      const expense = visible
-        .filter(t => t.type === "expense")
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      document.getElementById("income").textContent = money(income);
-      document.getElementById("expense").textContent = money(expense);
-      document.getElementById("balance").textContent = money(income - expense);
-
-      const list = document.getElementById("transactions");
-      list.replaceChildren();
-
-      visible.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach(t => {
-        const row = document.createElement("div");
-        row.className = "transaction";
-
-        const details = document.createElement("div");
-        const title = document.createElement("strong");
-        title.textContent = t.description || t.category;
-        const meta = document.createElement("small");
-        const personName = {me: "שלי", wife: "של אשתי", family: "משפחתי"}[t.person];
-        meta.textContent = `${personName} · ${t.category} · ${t.date}`;
-        details.append(title, meta);
-
-        const right = document.createElement("div");
-        const amount = document.createElement("div");
-        amount.className = t.type === "income" ? "income" : "expense";
-        amount.textContent = `${t.type === "income" ? "+" : "−"}${money(t.amount)}`;
-
-        const del = document.createElement("button");
-        del.className = "delete";
-        del.textContent = "מחיקה";
-        del.type = "button";
-        del.addEventListener("click", () => {
-          if (confirm("למחוק את התנועה?")) {
-            transactions = transactions.filter(x => x.id !== t.id);
-            save();
-          }
-        });
-
-        right.append(amount, del);
-        row.append(details, right);
-        list.append(row);
-      });
-
-      if (!visible.length) {
-        const empty = document.createElement("p");
-        empty.textContent = "עדיין אין תנועות. אפשר להוסיף את התנועה הראשונה למעלה.";
-        list.append(empty);
-      }
-    }
-
-    form.addEventListener("submit", event => {
-      event.preventDefault();
-      const amount = Number(document.getElementById("amount").value);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        alert("יש להזין סכום חיובי.");
-        return;
-      }
-      transactions.push({
-        id: crypto.randomUUID(),
-        person: document.getElementById("person").value,
-        type: document.getElementById("type").value,
-        amount,
-        category: document.getElementById("category").value,
-        description: document.getElementById("description").value.trim(),
-        date: dateInput.value
-      });
-      save();
-      form.reset();
-      dateInput.value = new Date().toISOString().slice(0, 10);
-    });
-
-    document.getElementById("filter").addEventListener("change", render);
-
-    document.getElementById("export").addEventListener("click", () => {
-      const rows = [["תאריך", "אדם", "סוג", "סכום", "קטגוריה", "תיאור"]];
-      transactions.forEach(t => rows.push([
-        t.date, t.person, t.type, t.amount, t.category, t.description
-      ]));
-      const csv = "\uFEFF" + rows.map(row =>
-        row.map(value => '"' + String(value).replace(/"/g, '""') + '"').join(",")
-      ).join("\r\n");
-      const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "haeshbon-sheli.csv";
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    render();
-  </script>
-</body>
-</html>
-```
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>החשבון שלי</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial;background:#f2f5fa;color:#1d2939}header{background:#173b70;color:white;padding:22px;text-align:center}main{max-width:820px;margin:auto;padding:16px}.panel,.card{background:white;padding:16px;border-radius:14px;margin-bottom:15px;box-shadow:0 2px 8px #0001}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card{text-align:center}.card strong{display:block;font-size:20px;margin-top:8px}label{display:block;margin:12px 0 5px}input,select,button{width:100%;padding:12px;border:1px solid #ccd4df;border-radius:8px;font-size:16px}button{background:#1e5aa8;color:white;border:0;margin-top:14px;cursor:pointer;font-weight:bold}.smallbtn{width:auto;margin:0;padding:7px 10px;background:#a83232}.row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #eee}.income{color:#16804a}.expense{color:#c0392b}.notice{font-size:13px;color:#667085;line-height:1.5}.status{background:#eef4ff;padding:10px;border-radius:8px;margin-bottom:12px;white-space:pre-wrap}.hidden{display:none!important}@media(max-width:520px){.cards{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>💰 החשבון שלי</h1><div>ניהול ההכנסות וההוצאות של המשפחה</div></header>
+<main><div id="status" class="status">מתחבר…</div>
+<section id="auth" class="panel hidden"><h2>התחברות</h2><p class="notice">התחבר עם האימייל והסיסמה של המשתמש שיצרת ב־Supabase.</p><form id="login"><label>אימייל</label><input id="email" type="email" required autocomplete="username"><label>סיסמה</label><input id="password" type="password" required autocomplete="current-password"><button>התחברות</button></form></section>
+<section id="app" class="hidden"><div class="panel"><span id="who"></span><button id="logout">התנתקות</button></div>
+<div class="cards"><div class="card">הכנסות<strong id="income">₪0</strong></div><div class="card">הוצאות<strong id="expense">₪0</strong></div><div class="card">יתרה<strong id="balance">₪0</strong></div></div>
+<section class="panel"><h2>הוספת תנועה</h2><form id="form">
+<label>של מי התנועה?</label><select id="person"><option value="me">שלי</option><option value="wife">של אשתי</option><option value="family">משפחתי</option></select>
+<label>סוג התנועה</label><select id="type"><option value="expense">הוצאה</option><option value="income">הכנסה</option></select>
+<label>סכום בשקלים</label><input id="amount" type="number" min=".01" step=".01" required>
+<label>קטגוריה</label><select id="category"><option>מזון וקניות</option><option>דיור וחשבונות</option><option>רכב ותחבורה</option><option>בריאות</option><option>בילויים</option><option>קניות אחרות</option><option>משכורת</option><option>קצבה</option><option>הכנסה אחרת</option><option>אחר</option></select>
+<label>כרטיס / אמצעי תשלום (לא חובה)</label><input id="card" type="text">
+<label>תיאור</label><input id="description" type="text" placeholder="לדוגמה: קניות בסופר">
+<label>תאריך</label><input id="date" type="date" required><button>שמירת תנועה בענן</button></form></section>
+<section class="panel"><h2>התנועות</h2><label>סינון לפי אדם</label><select id="filter"><option value="all">כל המשפחה</option><option value="me">שלי</option><option value="wife">של אשתי</option><option value="family">משפחתי</option></select><div id="list"></div><p class="notice">הנתונים נשמרים בענן. שיתוף עם אשתך יפעל אחרי שיוך המשתמש שלה לאותו משק בית.</p><button id="export">ייצוא CSV</button></section></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+const URL="https://wtgqntdkxgudmuxtviun.supabase.co";
+const KEY="sb_publishable_dE2lZoG9T9lSGREI2TikhQ_gG6px1VC";
+const db=window.supabase.createClient(URL,KEY);
+const $=id=>document.getElementById(id);let user=null,household=null,tx=[];
+$("date").value=new Date().toLocaleDateString("en-CA");
+const money=n=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS"}).format(n);
+function msg(s){$("status").textContent=s}
+function loggedOut(s){$("auth").classList.remove("hidden");$("app").classList.add("hidden");msg(s)}
+async function findHousehold(){
+ let r=await db.from("household_members").select("household_id").eq("user_id",user.id).limit(1).maybeSingle();
+ if(r.error)throw Error("קריאת שיוך המשפחה נכשלה: "+r.error.message);
+ if(r.data?.household_id)return r.data.household_id;
+ r=await db.from("households").select("id").eq("owner_id",user.id).limit(1).maybeSingle();
+ if(r.error)throw Error("מציאת המשפחה נכשלה: "+r.error.message);
+ if(r.data?.id)return r.data.id;
+ throw Error("לא נמצא שיוך משפחתי למשתמש. צריך לבדוק את household_members וההרשאות.");
+}
+async function load(){
+ msg("טוען תנועות מהענן…");
+ const r=await db.from("transactions").select("id,household_id,created_by,person,type,amount,category,description,card_name,transaction_date").eq("household_id",household).order("transaction_date",{ascending:false});
+ if(r.error)throw Error("טעינת התנועות נכשלה: "+r.error.message);
+ tx=(r.data||[]).map(t=>({...t,amount:Number(t.amount),date:t.transaction_date}));
+ render();msg("מחובר לענן. התנועות נטענו.");
+}
+function render(){
+ const f=$("filter").value,arr=tx.filter(t=>f==="all"||t.person===f);
+ const inc=arr.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),exp=arr.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+ $("income").textContent=money(inc);$("expense").textContent=money(exp);$("balance").textContent=money(inc-exp);$("list").replaceChildren();
+ arr.forEach(t=>{const row=document.createElement("div");row.className="row";const d=document.createElement("div"),title=document.createElement("strong"),meta=document.createElement("small");title.textContent=t.description||t.category;meta.textContent=({me:"שלי",wife:"של אשתי",family:"משפחתי"}[t.person]||t.person)+" · "+t.category+" · "+t.date+(t.card_name?" · "+t.card_name:"");d.append(title,document.createElement("br"),meta);const side=document.createElement("div"),a=document.createElement("div"),del=document.createElement("button");a.className=t.type==="income"?"income":"expense";a.textContent=(t.type==="income"?"+":"−")+money(t.amount);del.className="smallbtn";del.textContent="מחיקה";del.onclick=async()=>{if(!confirm("למחוק את התנועה?"))return;const r=await db.from("transactions").delete().eq("id",t.id).eq("household_id",household);if(r.error){msg("מחיקה נכשלה: "+r.error.message);return}tx=tx.filter(x=>x.id!==t.id);render();msg("התנועה נמחקה")};side.append(a,del);row.append(d,side);$("list").append(row)});
+ if(!arr.length)$("list").textContent="עדיין אין תנועות.";
+}
+$("login").onsubmit=async e=>{e.preventDefault();msg("מתחבר…");const r=await db.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});if(r.error){msg("התחברות נכשלה: "+r.error.message);return}user=r.data.user;try{household=await findHousehold();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("who").textContent="מחובר: "+user.email;await load()}catch(e){$("auth").classList.add("hidden");$("app").classList.remove("hidden");msg(e.message)}};
+$("logout").onclick=async()=>{await db.auth.signOut();user=null;household=null;tx=[];loggedOut("התנתקת מהחשבון.")};
+$("form").onsubmit=async e=>{e.preventDefault();if(!user||!household){msg("צריך להתחבר ולוודא שיוך למשפחה.");return}const amount=Number($("amount").value);if(!Number.isFinite(amount)||amount<=0){alert("יש להזין סכום חיובי");return}
+const row={household_id:household,created_by:user.id,person:$("person").value,type:$("type").value,amount,category:$("category").value,description:$("description").value.trim(),card_name:$("card").value.trim()||null,transaction_date:$("date").value};
+msg("שומר בענן…");const r=await db.from("transactions").insert(row).select("id,household_id,created_by,person,type,amount,category,description,card_name,transaction_date").single();if(r.error){msg("השמירה נכשלה: "+r.error.message);return}tx.unshift({...r.data,amount:Number(r.data.amount),date:r.data.transaction_date});render();$("form").reset();$("date").value=new Date().toLocaleDateString("en-CA");msg("התנועה נשמרה בענן בהצלחה.")};
+$("filter").onchange=render;
+$("export").onclick=()=>{const rows=[["תאריך","אדם","סוג","סכום","קטגוריה","תיאור","כרטיס"],...tx.map(t=>[t.date,t.person,t.type,t.amount,t.category,t.description,t.card_name])];const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="haeshbon-sheli.csv";a.click();URL.revokeObjectURL(url)};
+async function init(){if(KEY==="PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE"){loggedOut("צריך להכניס את ה־Publishable key בקוד לפני התחברות.");return}const r=await db.auth.getSession();if(r.error){loggedOut("בדיקת התחברות נכשלה: "+r.error.message);return}if(r.data.session){user=r.data.session.user;try{household=await findHousehold();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("who").textContent="מחובר: "+user.email;await load()}catch(e){$("auth").classList.add("hidden");$("app").classList.remove("hidden");msg(e.message)}}else loggedOut("התחבר עם האימייל והסיסמה של המשתמש שלך ב־Supabase.")}
+init();
+</script></body></html>
